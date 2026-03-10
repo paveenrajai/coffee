@@ -149,7 +149,10 @@ class AskLLM:
         
         for attempt in range(self._max_retries):
             try:
-                if isinstance(self._client, (OpenAIResponsesClient, AnthropicMessagesClient)):
+                if isinstance(
+                    self._client,
+                    (OpenAIResponsesClient, AnthropicMessagesClient, GoogleTextClient),
+                ):
                     result = self._client.generate(
                         prompt=prompt,
                         model=self._model,

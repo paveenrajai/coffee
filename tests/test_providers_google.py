@@ -5,6 +5,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from ask_llm.exceptions import ConfigurationError
 from ask_llm.providers.google import GoogleTextClient
+from ask_llm.providers.google.text_client import (
+    _convert_tools_to_gemini,
+    _inline_json_schema_refs,
+)
 
 
 class TestGoogleTextClientInitialization:
@@ -95,6 +99,117 @@ class TestGoogleTextClientBuildConfigDict:
                 }
                 config = client._build_config_dict(response_format=response_format)
                 assert "tools" not in config
+
+    def test_build_config_with_tools_schema(self):
+        """Test that tools_schema adds function_declarations instead of google_search."""
+        with patch.dict("os.environ", {"GOOGLE_API_KEY": "test-key"}):
+            with patch("ask_llm.providers.google.text_client.genai.Client"):
+                client = GoogleTextClient()
+                tools = [
+                    {
+                        "type": "function",
+                        "function": {
+                            "name": "get_weather",
+                            "description": "Get weather",
+                            "parameters": {
+                                "type": "object",
+                                "properties": {"location": {"type": "string"}},
+                            },
+                        },
+                    }
+                ]
+                config = client._build_config_dict(tools_schema=tools)
+                assert "tools" in config
+                assert config["tools"] != [{"google_search": {}}]
+                assert len(config["tools"]) == 1
+
+
+class TestConvertToolsToGemini:
+    """Tests for _convert_tools_to_gemini."""
+
+    def test_convert_openai_style(self):
+        """Test converting OpenAI-style function tool."""
+        tools = [
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_weather",
+                    "description": "Get weather",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {"location": {"type": "string"}},
+                        "required": ["location"],
+                    },
+                },
+            }
+        ]
+        result = _convert_tools_to_gemini(tools)
+        assert len(result) == 1
+        assert result[0]["name"] == "get_weather"
+        assert result[0]["description"] == "Get weather"
+        assert result[0]["parameters"]["type"] == "object"
+
+    def test_convert_empty(self):
+        """Test empty tools list."""
+        assert _convert_tools_to_gemini([]) == []
+
+
+class TestInlineJsonSchemaRefs:
+    """Tests for _inline_json_schema_refs (Gemini $ref/$defs compatibility)."""
+
+    def test_inline_ref_and_remove_defs(self):
+        """Test that $ref is inlined and $defs is removed."""
+        schema = {
+            "type": "object",
+            "properties": {
+                "texts": {
+                    "type": "array",
+                    "items": {"$ref": "#/$defs/MeasureTextItem"},
+                },
+            },
+            "required": ["texts"],
+            "$defs": {
+                "MeasureTextItem": {
+                    "type": "object",
+                    "properties": {
+                        "text": {"type": "string"},
+                        "fontSize": {"type": "string", "default": "body"},
+                    },
+                    "required": ["text"],
+                },
+            },
+        }
+        result = _inline_json_schema_refs(schema)
+        assert "$defs" not in result
+        assert "$ref" not in str(result)
+        items_schema = result["properties"]["texts"]["items"]
+        assert items_schema["type"] == "object"
+        assert "text" in items_schema["properties"]
+
+    def test_passthrough_simple_schema(self):
+        """Test schema without $ref/$defs is unchanged."""
+        schema = {"type": "object", "properties": {"x": {"type": "string"}}}
+        result = _inline_json_schema_refs(schema)
+        assert result == schema
+
+    def test_strips_additional_properties(self):
+        """Test that additionalProperties is stripped (Gemini rejects it)."""
+        schema = {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {"x": {"type": "string"}},
+                        "additionalProperties": False,
+                    },
+                },
+            },
+        }
+        result = _inline_json_schema_refs(schema)
+        assert "additionalProperties" not in str(result)
+        assert result["properties"]["items"]["items"]["type"] == "object"
 
 
 class TestGoogleTextClientGetSystemPromptHash:

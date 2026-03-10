@@ -184,9 +184,9 @@ Generate a response from the LLM.
 - `top_p` (float, optional): Nucleus sampling parameter
 - `presence_penalty` (float, optional): Presence penalty (OpenAI only)
 - `reasoning_effort` (str, optional): Reasoning effort level (OpenAI only)
-- `tools_schema` (list, optional): Tool/function calling schema (OpenAI, Anthropic)
+- `tools_schema` (list, optional): Tool/function calling schema (OpenAI, Anthropic, Google)
 - `response_format` (dict, optional): Response format specification
-- `execute_tool_cb` (callable, optional): Tool execution callback (OpenAI, Anthropic)
+- `execute_tool_cb` (callable, optional): Tool execution callback (OpenAI, Anthropic, Google)
 - `max_steps` (int, optional): Maximum tool-calling steps (OpenAI only, default: 24)
 - `max_effective_tool_steps` (int, optional): Maximum effective tool steps (OpenAI only, default: 12)
 
