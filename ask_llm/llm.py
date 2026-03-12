@@ -9,6 +9,8 @@ from .exceptions import ConfigurationError, ValidationError, APIError, RateLimit
 from .providers.anthropic import AnthropicMessagesClient
 from .providers.google import GoogleTextClient
 from .providers.openai import OpenAIResponsesClient
+from .cost import estimate_cost
+from .types import AskResult, TokenUsage
 
 logger = logging.getLogger(__name__)
 
@@ -25,10 +27,12 @@ class AskLLM:
         from ask_llm import AskLLM
 
         llm = AskLLM(model="gpt-4o-mini")
-        response = await llm.ask(
+        result = await llm.ask(
             prompt="What is Python?",
             system_instruct="You are a helpful assistant."
         )
+        print(result.text)
+        print(result.usage.input_tokens, result.usage.output_tokens)
         ```
     """
 
@@ -92,7 +96,7 @@ class AskLLM:
         max_steps: int = 24,
         max_effective_tool_steps: int = 12,
         force_tool_use: bool = False,
-    ) -> str:
+    ) -> AskResult:
         """
         Ask the LLM a question.
 
@@ -117,7 +121,7 @@ class AskLLM:
                 Prevents text-only responses when tools are provided.
 
         Returns:
-            Generated text response
+            AskResult with text and token usage
 
         Raises:
             ValidationError: If prompt is empty or invalid parameters provided.
@@ -172,9 +176,11 @@ class AskLLM:
                     )
                     if hasattr(result, "__await__"):
                         result = await result
-                    return result
+                    text, usage = result if isinstance(result, tuple) else (result, TokenUsage(0, 0, 0, None))
+                    usage = self._usage_with_cost(usage)
+                    return AskResult(text=text, usage=usage)
 
-                return await self._client.generate(
+                result = await self._client.generate(
                     prompt=prompt,
                     model=self._model,
                     system_instruct=system_instruct or "",
@@ -184,6 +190,9 @@ class AskLLM:
                     top_p=top_p,
                     response_format=response_format,
                 )
+                text, usage = result if isinstance(result, tuple) else (result, TokenUsage(0, 0, 0, None))
+                usage = self._usage_with_cost(usage)
+                return AskResult(text=text, usage=usage)
             except Exception as e:
                 last_exception = e
                 
@@ -221,6 +230,17 @@ class AskLLM:
             raise APIError(f"Failed to generate response after {self._max_retries} attempts: {last_exception}") from last_exception
         raise APIError("Failed to generate response: unknown error")
     
+    def _usage_with_cost(self, usage: TokenUsage) -> TokenUsage:
+        """Add cost_usd to usage."""
+        cost = estimate_cost(usage, self._model)
+        return TokenUsage(
+            input_tokens=usage.input_tokens,
+            output_tokens=usage.output_tokens,
+            total_tokens=usage.total_tokens,
+            cached_tokens=usage.cached_tokens,
+            cost_usd=cost,
+        )
+
     async def _wait_if_needed(self) -> None:
         """Wait if needed to maintain minimum delay between calls."""
         if self._last_call_time is not None:

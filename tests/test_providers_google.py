@@ -241,6 +241,9 @@ class TestGoogleTextClientGenerate:
                 mock_models = MagicMock()
                 mock_response = MagicMock()
                 mock_response.text = "Test response"
+                mock_response.usage_metadata = MagicMock(
+                    prompt_token_count=10, candidates_token_count=5
+                )
 
                 async def mock_generate(*args, **kwargs):
                     return mock_response
@@ -251,10 +254,13 @@ class TestGoogleTextClientGenerate:
                 mock_genai.return_value = mock_client_instance
 
                 client = GoogleTextClient()
-                result = await client.generate(
+                text, usage = await client.generate(
                     prompt="What is Python?", model="gemini-2.0-flash-exp"
                 )
-                assert result == "Test response"
+                assert text == "Test response"
+                assert usage is not None
+                assert usage.input_tokens == 10
+                assert usage.output_tokens == 5
 
     @pytest.mark.asyncio
     async def test_generate_with_system_instruct(self):
@@ -266,6 +272,9 @@ class TestGoogleTextClientGenerate:
                 mock_models = MagicMock()
                 mock_response = MagicMock()
                 mock_response.text = "Test response"
+                mock_response.usage_metadata = MagicMock(
+                    prompt_token_count=8, candidates_token_count=4
+                )
 
                 async def mock_generate(*args, **kwargs):
                     return mock_response
@@ -276,12 +285,13 @@ class TestGoogleTextClientGenerate:
                 mock_genai.return_value = mock_client_instance
 
                 client = GoogleTextClient()
-                result = await client.generate(
+                text, usage = await client.generate(
                     prompt="What is Python?",
                     model="gemini-2.0-flash-exp",
                     system_instruct="You are a helpful assistant.",
                 )
-                assert result == "Test response"
+                assert text == "Test response"
+                assert usage is not None
 
     @pytest.mark.asyncio
     async def test_generate_with_max_tokens(self):
@@ -293,6 +303,9 @@ class TestGoogleTextClientGenerate:
                 mock_models = MagicMock()
                 mock_response = MagicMock()
                 mock_response.text = "Test response"
+                mock_response.usage_metadata = MagicMock(
+                    prompt_token_count=12, candidates_token_count=6
+                )
 
                 async def mock_generate(*args, **kwargs):
                     return mock_response
@@ -303,8 +316,9 @@ class TestGoogleTextClientGenerate:
                 mock_genai.return_value = mock_client_instance
 
                 client = GoogleTextClient()
-                result = await client.generate(
+                text, usage = await client.generate(
                     prompt="What is Python?", model="gemini-2.0-flash-exp", max_tokens=100
                 )
-                assert result == "Test response"
+                assert text == "Test response"
+                assert usage is not None
 

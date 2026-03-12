@@ -9,6 +9,7 @@ import os
 from typing import Any, Callable, Dict, List, Optional
 
 from ...exceptions import ConfigurationError, APIError
+from ...types import TokenUsage
 
 logger = logging.getLogger(__name__)
 
@@ -258,6 +259,8 @@ class AnthropicMessagesClient:
         effective_steps = 0
         consecutive_reasoning_only = 0
         pending_resp: Optional[Any] = None
+        total_input = 0
+        total_output = 0
 
         for step in range(max_steps):
             try:
@@ -290,6 +293,10 @@ class AnthropicMessagesClient:
             if usage:
                 inp = getattr(usage, "input_tokens", None)
                 out = getattr(usage, "output_tokens", None)
+                if inp is not None:
+                    total_input += inp
+                if out is not None:
+                    total_output += out
                 if inp is not None or out is not None:
                     usage_str = f", usage=input={inp or 0} output={out or 0}"
 
@@ -424,6 +431,10 @@ class AnthropicMessagesClient:
                 ]
                 finalize_resp = await client.messages.create(**finalize_params)
                 final_text = self._content_to_text(getattr(finalize_resp, "content", []) or [])
+                fu = getattr(finalize_resp, "usage", None)
+                if fu:
+                    total_input += getattr(fu, "input_tokens", 0) or 0
+                    total_output += getattr(fu, "output_tokens", 0) or 0
             except Exception as e:
                 error_str = str(e).lower()
                 if "429" in error_str or "rate limit" in error_str or "too many requests" in error_str:
@@ -435,4 +446,10 @@ class AnthropicMessagesClient:
         if not final_text.strip():
             raise APIError("Empty response received from Anthropic API")
 
-        return final_text
+        usage = TokenUsage(
+            input_tokens=total_input,
+            output_tokens=total_output,
+            total_tokens=total_input + total_output,
+            cached_tokens=None,
+        )
+        return final_text, usage

@@ -125,10 +125,12 @@ class TestOpenAIResponsesClientGenerate:
                 mock_openai.return_value = mock_client_instance
 
                 client = OpenAIResponsesClient()
-                result = await client.generate(
+                text, usage = await client.generate(
                     prompt="What is Python?", model="gpt-4o-mini"
                 )
-                assert result == "Test response"
+                assert text == "Test response"
+                assert usage is not None
+                assert usage.input_tokens == 10
 
     @pytest.mark.asyncio
     async def test_generate_with_instructions(self):
@@ -150,12 +152,13 @@ class TestOpenAIResponsesClientGenerate:
                 mock_openai.return_value = mock_client_instance
 
                 client = OpenAIResponsesClient()
-                result = await client.generate(
+                text, usage = await client.generate(
                     prompt="What is Python?",
                     model="gpt-4o-mini",
                     instructions="You are a helpful assistant.",
                 )
-                assert result == "Test response"
+                assert text == "Test response"
+                assert usage is not None
 
     @pytest.mark.asyncio
     async def test_generate_with_max_tokens(self):
@@ -177,8 +180,9 @@ class TestOpenAIResponsesClientGenerate:
                 mock_openai.return_value = mock_client_instance
 
                 client = OpenAIResponsesClient()
-                result = await client.generate(
+                text, usage = await client.generate(
                     prompt="What is Python?", model="gpt-4o-mini", max_tokens=100
                 )
-                assert result == "Test response"
+                assert text == "Test response"
+                assert usage is not None
 

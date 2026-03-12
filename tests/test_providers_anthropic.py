@@ -122,6 +122,7 @@ class TestAnthropicMessagesClientGenerate:
                 mock_response = MagicMock()
                 mock_response.content = [{"type": "text", "text": "Test response"}]
                 mock_response.stop_reason = "end_turn"
+                mock_response.usage = MagicMock(input_tokens=10, output_tokens=5)
 
                 async def mock_create(*args, **kwargs):
                     return mock_response
@@ -130,10 +131,13 @@ class TestAnthropicMessagesClientGenerate:
                 mock_anthropic.return_value = mock_client
 
                 client = AnthropicMessagesClient()
-                result = await client.generate(
+                text, usage = await client.generate(
                     prompt="What is Python?", model="claude-sonnet-4-6"
                 )
-                assert result == "Test response"
+                assert text == "Test response"
+                assert usage is not None
+                assert usage.input_tokens == 10
+                assert usage.output_tokens == 5
 
     @pytest.mark.asyncio
     async def test_generate_with_system_instruction(self):
@@ -144,6 +148,7 @@ class TestAnthropicMessagesClientGenerate:
                 mock_response = MagicMock()
                 mock_response.content = [{"type": "text", "text": "Hello"}]
                 mock_response.stop_reason = "end_turn"
+                mock_response.usage = MagicMock(input_tokens=5, output_tokens=3)
 
                 async def mock_create(*args, **kwargs):
                     assert kwargs.get("system") == "You are helpful."
@@ -153,9 +158,9 @@ class TestAnthropicMessagesClientGenerate:
                 mock_anthropic.return_value = mock_client
 
                 client = AnthropicMessagesClient()
-                result = await client.generate(
+                text, usage = await client.generate(
                     prompt="Hi",
                     model="claude-sonnet-4-6",
                     instructions="You are helpful.",
                 )
-                assert result == "Hello"
+                assert text == "Hello"

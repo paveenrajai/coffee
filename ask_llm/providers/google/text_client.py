@@ -19,6 +19,7 @@ from .utils.citations import (
 import httpx
 
 from ...exceptions import ConfigurationError, APIError
+from ...types import TokenUsage
 
 logger = logging.getLogger(__name__)
 
@@ -396,6 +397,9 @@ class GoogleTextClient:
         last_nonempty_output = ""
         effective_steps = 0
         consecutive_reasoning_only = 0
+        total_input = 0
+        total_output = 0
+        total_cached: Optional[int] = None
 
         for step in range(max_steps):
             try:
@@ -411,6 +415,14 @@ class GoogleTextClient:
             text = str(getattr(resp, "text", None) or getattr(resp, "output_text", "") or "")
             if text.strip():
                 last_nonempty_output = text
+
+            um = getattr(resp, "usage_metadata", None)
+            if um:
+                total_input += getattr(um, "prompt_token_count", 0) or 0
+                total_output += getattr(um, "candidates_token_count", 0) or 0
+                cc = getattr(um, "cached_content_token_count", None)
+                if cc is not None:
+                    total_cached = (total_cached or 0) + cc
 
             if not use_tools:
                 break
@@ -496,4 +508,10 @@ class GoogleTextClient:
         except Exception as e:
             logger.debug(f"Failed to inject citations: {e}")
 
-        return text
+        usage = TokenUsage(
+            input_tokens=total_input,
+            output_tokens=total_output,
+            total_tokens=total_input + total_output,
+            cached_tokens=total_cached if total_cached else None,
+        )
+        return text, usage

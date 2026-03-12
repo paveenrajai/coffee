@@ -3,7 +3,7 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from ask_llm import AskLLM
+from ask_llm import AskLLM, TokenUsage
 from ask_llm.exceptions import APIError, ConfigurationError, ValidationError
 
 
@@ -160,11 +160,18 @@ class TestAskLLMAskMethod:
         ):
             llm = AskLLM(model="gpt-4o-mini")
             mock_client_instance = MagicMock()
-            mock_client_instance.generate = AsyncMock(return_value="Test response")
+            mock_client_instance.generate = AsyncMock(
+                return_value=(
+                    "Test response",
+                    TokenUsage(input_tokens=10, output_tokens=5, total_tokens=15, cached_tokens=None),
+                )
+            )
             llm._client.generate = mock_client_instance.generate
 
-            response = await llm.ask(prompt="What is Python?")
-            assert response == "Test response"
+            result = await llm.ask(prompt="What is Python?")
+            assert result.text == "Test response"
+            assert result.usage.input_tokens == 10
+            assert result.usage.output_tokens == 5
 
     @pytest.mark.asyncio
     async def test_ask_with_google_success(self, mock_google_api_key):
@@ -175,8 +182,8 @@ class TestAskLLMAskMethod:
             mock_client_instance.generate = AsyncMock(return_value="Test response")
             llm._client.generate = mock_client_instance.generate
 
-            response = await llm.ask(prompt="What is Python?")
-            assert response == "Test response"
+            result = await llm.ask(prompt="What is Python?")
+            assert result.text == "Test response"
 
     @pytest.mark.asyncio
     async def test_ask_with_system_instruct(self, mock_openai_api_key):
@@ -187,10 +194,10 @@ class TestAskLLMAskMethod:
             mock_client_instance.generate = AsyncMock(return_value="Test response")
             llm._client.generate = mock_client_instance.generate
 
-            response = await llm.ask(
+            result = await llm.ask(
                 prompt="What is Python?", system_instruct="You are a helpful assistant."
             )
-            assert response == "Test response"
+            assert result.text == "Test response"
 
     @pytest.mark.asyncio
     async def test_ask_api_error_handling(self, mock_openai_api_key):

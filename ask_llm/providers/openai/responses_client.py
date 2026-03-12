@@ -7,6 +7,7 @@ import os
 from typing import Any, Callable, Dict, List, Optional
 
 from ...exceptions import ConfigurationError, APIError
+from ...types import TokenUsage
 
 logger = logging.getLogger(__name__)
 
@@ -94,6 +95,26 @@ class OpenAIResponsesClient:
             return {"format": {"type": "text"}}
 
         return None
+
+    @staticmethod
+    def _extract_usage(resp: Any) -> Optional[TokenUsage]:
+        """Extract token usage from OpenAI response."""
+        try:
+            usage = getattr(resp, "usage", None)
+            if not usage:
+                return None
+            inp = getattr(usage, "input_tokens", None) or getattr(usage, "prompt_tokens", 0)
+            out = getattr(usage, "output_tokens", 0)
+            total = getattr(usage, "total_tokens", None) or (inp + out)
+            cached = getattr(usage, "cached_tokens", None)
+            return TokenUsage(
+                input_tokens=int(inp),
+                output_tokens=int(out),
+                total_tokens=int(total),
+                cached_tokens=int(cached) if cached is not None else None,
+            )
+        except Exception:
+            return None
 
     def _log_cache_usage(self, resp: Any) -> None:
         """Log OpenAI cache usage if available."""
@@ -287,6 +308,9 @@ class OpenAIResponsesClient:
         effective_steps = 0
         consecutive_reasoning_only = 0
         pending_resp: Optional[Any] = None
+        total_input = 0
+        total_output = 0
+        total_cached: Optional[int] = 0
 
         for step in range(max_steps):
             try:
@@ -307,6 +331,12 @@ class OpenAIResponsesClient:
                 raise APIError(f"OpenAI API request failed: {e}") from e
 
             self._log_cache_usage(resp)
+            step_usage = self._extract_usage(resp)
+            if step_usage:
+                total_input += step_usage.input_tokens
+                total_output += step_usage.output_tokens
+                if step_usage.cached_tokens is not None:
+                    total_cached = (total_cached or 0) + step_usage.cached_tokens
 
             try:
                 txt = getattr(resp, "output_text", "") or ""
@@ -527,6 +557,12 @@ class OpenAIResponsesClient:
                 finalize_params["input"] = finalize_params_input
                 finalize_resp = await client.responses.create(**finalize_params)
                 final_text = getattr(finalize_resp, "output_text", "") or ""
+                final_usage = self._extract_usage(finalize_resp)
+                if final_usage:
+                    total_input += final_usage.input_tokens
+                    total_output += final_usage.output_tokens
+                    if final_usage.cached_tokens is not None:
+                        total_cached = (total_cached or 0) + final_usage.cached_tokens
             except Exception as e:
                 error_str = str(e).lower()
                 # Check if it's a rate limit error (429)
@@ -541,4 +577,10 @@ class OpenAIResponsesClient:
         if not final_text.strip():
             raise APIError("Empty response received from OpenAI API")
 
-        return final_text
+        usage = TokenUsage(
+            input_tokens=total_input,
+            output_tokens=total_output,
+            total_tokens=total_input + total_output,
+            cached_tokens=total_cached if total_cached else None,
+        )
+        return final_text, usage
