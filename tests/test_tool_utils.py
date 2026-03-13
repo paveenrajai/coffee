@@ -1,6 +1,5 @@
 """Tests for shared tool_utils."""
 
-import pytest
 from unittest.mock import MagicMock
 
 from coffee_with_llm.providers.tool_utils import (

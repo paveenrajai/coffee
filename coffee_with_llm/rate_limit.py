@@ -15,18 +15,21 @@ _RATE_LIMIT_EXCEPTIONS: Tuple[Type[Exception], ...] = ()
 
 try:
     from openai import RateLimitError as OpenAIRateLimitError
+
     _RATE_LIMIT_EXCEPTIONS = (*_RATE_LIMIT_EXCEPTIONS, OpenAIRateLimitError)
 except ImportError:
     pass
 
 try:
     from anthropic import RateLimitError as AnthropicRateLimitError
+
     _RATE_LIMIT_EXCEPTIONS = (*_RATE_LIMIT_EXCEPTIONS, AnthropicRateLimitError)
 except ImportError:
     pass
 
 try:
     from httpx import HTTPStatusError
+
     _HTTP_STATUS_ERROR: Type[HTTPStatusError] | None = HTTPStatusError
 except ImportError:
     _HTTP_STATUS_ERROR = None
@@ -55,9 +58,8 @@ def is_rate_limit_error(error: Exception) -> bool:
     # 3. Fallback: string matching
     error_str = str(error).lower()
     error_type = type(error).__name__.lower()
-    return (
-        any(ind in error_str for ind in _STRING_INDICATORS)
-        or any(ind in error_type for ind in _STRING_INDICATORS)
+    return any(ind in error_str for ind in _STRING_INDICATORS) or any(
+        ind in error_type for ind in _STRING_INDICATORS
     )
 
 

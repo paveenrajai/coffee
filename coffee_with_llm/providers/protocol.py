@@ -2,14 +2,24 @@
 
 from __future__ import annotations
 
-from typing import Any, AsyncIterator, Callable, Dict, List, Optional, Protocol, Union, runtime_checkable
+from typing import (
+    Any,
+    AsyncIterator,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Protocol,
+    Union,
+    runtime_checkable,
+)
 
 from ..types import TokenUsage
 
 
 @runtime_checkable
 class ProviderProtocol(Protocol):
-    """Protocol for LLM provider clients. All providers must implement generate() and generate_stream()."""
+    """Protocol for LLM providers. Implement generate() and generate_stream()."""
 
     async def generate(
         self,
@@ -25,7 +35,9 @@ class ProviderProtocol(Protocol):
         tools_schema: Optional[List[Dict[str, Any]]] = None,
         response_format: Optional[Dict[str, Any]] = None,
         execute_tool_cb: Optional[Callable[[str, Dict[str, Any]], Any]] = None,
-        tool_error_callback: Optional[Callable[[str, Optional[str], Dict[str, Any]], Optional[str]]] = None,
+        tool_error_callback: Optional[
+            Callable[[str, Optional[str], Dict[str, Any]], Optional[str]]
+        ] = None,
         max_steps: int = 24,
         max_effective_tool_steps: int = 12,
         force_tool_use: bool = False,

@@ -1,7 +1,8 @@
 """Tests for OpenAI provider."""
 
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 
 from coffee_with_llm import Config
 from coffee_with_llm.exceptions import ConfigurationError
@@ -10,7 +11,12 @@ from coffee_with_llm.providers.tool_utils import normalize_tool_result
 
 
 def _config(openai_api_key="test-key"):
-    return Config(openai_api_key=openai_api_key, anthropic_api_key=None, google_api_key=None, request_timeout=60.0)
+    return Config(
+        openai_api_key=openai_api_key,
+        anthropic_api_key=None,
+        google_api_key=None,
+        request_timeout=60.0,
+    )
 
 
 class TestOpenAIResponsesClientInitialization:
@@ -18,7 +24,9 @@ class TestOpenAIResponsesClientInitialization:
 
     def test_init_without_api_key(self):
         """Test that missing API key raises ConfigurationError."""
-        cfg = Config(openai_api_key=None, anthropic_api_key=None, google_api_key=None, request_timeout=60.0)
+        cfg = Config(
+            openai_api_key=None, anthropic_api_key=None, google_api_key=None, request_timeout=60.0
+        )
         with pytest.raises(ConfigurationError, match="OpenAI.*not configured"):
             OpenAIResponsesClient(config=cfg)
 
@@ -31,6 +39,7 @@ class TestOpenAIResponsesClientInitialization:
     def test_init_with_missing_openai_package(self):
         """Test that missing OpenAI package raises ConfigurationError."""
         import builtins
+
         original_import = builtins.__import__
 
         def mock_import(name, *args, **kwargs):
@@ -112,29 +121,27 @@ class TestOpenAIResponsesClientGenerate:
     async def test_generate_basic(self):
         """Test basic generation."""
         with patch("openai.AsyncOpenAI") as mock_openai:
-                mock_client_instance = MagicMock()
-                mock_response = MagicMock()
-                mock_response.output_text = "Test response"
-                mock_response.usage = MagicMock()
-                mock_response.usage.input_tokens = 10
-                mock_response.usage.output_tokens = 1
-                mock_response.usage.cached_tokens = 0
-                mock_response.usage.prompt_tokens = 10
-                mock_response.required_action = None
+            mock_client_instance = MagicMock()
+            mock_response = MagicMock()
+            mock_response.output_text = "Test response"
+            mock_response.usage = MagicMock()
+            mock_response.usage.input_tokens = 10
+            mock_response.usage.output_tokens = 1
+            mock_response.usage.cached_tokens = 0
+            mock_response.usage.prompt_tokens = 10
+            mock_response.required_action = None
 
-                async def mock_create(*args, **kwargs):
-                    return mock_response
+            async def mock_create(*args, **kwargs):
+                return mock_response
 
-                mock_client_instance.responses.create = mock_create
-                mock_openai.return_value = mock_client_instance
+            mock_client_instance.responses.create = mock_create
+            mock_openai.return_value = mock_client_instance
 
-                client = OpenAIResponsesClient(config=_config())
-                text, usage = await client.generate(
-                    prompt="What is Python?", model="gpt-4o-mini"
-                )
-                assert text == "Test response"
-                assert usage is not None
-                assert usage.input_tokens == 10
+            client = OpenAIResponsesClient(config=_config())
+            text, usage = await client.generate(prompt="What is Python?", model="gpt-4o-mini")
+            assert text == "Test response"
+            assert usage is not None
+            assert usage.input_tokens == 10
 
     @pytest.mark.asyncio
     async def test_generate_with_instructions(self):
@@ -187,4 +194,3 @@ class TestOpenAIResponsesClientGenerate:
             )
             assert text == "Test response"
             assert usage is not None
-

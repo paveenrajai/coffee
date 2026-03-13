@@ -6,9 +6,9 @@ import time
 from typing import Any, AsyncIterator, Callable, Dict, List, Optional, Union
 
 from .config import Config
-from .exceptions import ConfigurationError, ValidationError, APIError, RateLimitError
-from .providers.registry import get_provider
 from .cost import estimate_cost
+from .exceptions import APIError, ConfigurationError, RateLimitError, ValidationError
+from .providers.registry import get_provider
 from .rate_limit import is_rate_limit_error, with_retry
 from .types import AskResult, StreamResult, TokenUsage
 
@@ -55,11 +55,11 @@ class AskLLM:
                  Provider is auto-detected based on model prefix.
                  Must be provided.
             config: Config instance. If None, uses Config.from_env() (API keys from env).
-            min_delay_between_calls: Minimum delay in seconds between consecutive API calls (default: 1.0)
+            min_delay_between_calls: Min delay in seconds between API calls (default: 1.0)
             max_retries: Maximum number of retries for rate limit errors (default: 3)
             request_timeout: Request timeout in seconds (default: 60)
             google_explicit_cache: Enable Google context caching for Gemini (default: True)
-            google_inline_citations: Inject [cite: url] markers when Gemini uses grounding (default: True)
+            google_inline_citations: Inject [cite: url] for Gemini grounding (default: True)
 
         Raises:
             ValidationError: If model is not provided.
@@ -85,9 +85,7 @@ class AskLLM:
                 google_inline_citations=google_inline_citations,
             )
         except Exception as e:
-            raise ConfigurationError(
-                f"Failed to initialize client for model '{model}': {e}"
-            ) from e
+            raise ConfigurationError(f"Failed to initialize client for model '{model}': {e}") from e
 
     async def ask(
         self,
@@ -103,7 +101,9 @@ class AskLLM:
         tools_schema: Optional[List[Dict[str, Any]]] = None,
         response_format: Optional[Dict[str, Any]] = None,
         execute_tool_cb: Optional[Callable[[str, Dict[str, Any]], Any]] = None,
-        tool_error_callback: Optional[Callable[[str, Optional[str], Dict[str, Any]], Optional[str]]] = None,
+        tool_error_callback: Optional[
+            Callable[[str, Optional[str], Dict[str, Any]], Optional[str]]
+        ] = None,
         max_steps: int = 24,
         max_effective_tool_steps: int = 12,
         force_tool_use: bool = False,
@@ -115,7 +115,7 @@ class AskLLM:
         Args:
             prompt: User prompt/question (appended to messages if provided)
             system_instruct: System instruction/prompt
-            messages: Optional conversation history (list of {"role": "user"|"assistant", "content": "..."})
+            messages: Optional history (list of {"role": "user"|"assistant", "content": "..."})
             max_tokens: Maximum tokens to generate
             temperature: Sampling temperature (0-2)
             top_p: Nucleus sampling parameter
@@ -124,14 +124,13 @@ class AskLLM:
             tools_schema: Tool/function calling schema (OpenAI, Anthropic, Google)
             response_format: Response format specification (JSON schema, etc.)
             execute_tool_cb: Callback for executing tools (OpenAI, Anthropic, Google)
-            tool_error_callback: When tool returns ok=False, called with (tool_name, error_code, payload).
-                error_code from payload (tool-defined). Return str to start new session with that message;
-                None to feed error back. (OpenAI, Anthropic, Google)
+            tool_error_callback: When tool returns ok=False, (tool_name, error_code, payload).
+                Return str to start new session; None to feed error back.
             max_steps: Maximum tool-calling steps (OpenAI, Anthropic, Google)
             max_effective_tool_steps: Maximum effective tool steps (OpenAI, Anthropic, Google)
             force_tool_use: When True, force at least one tool call (Anthropic tool_choice=any).
                 Prevents text-only responses when tools are provided.
-            stream: When True, return StreamResult (async iterable of chunks; usage after iteration).
+            stream: When True, return StreamResult (async iterable; usage after iteration).
                 Not supported with tools_schema or response_format.
 
         Returns:
@@ -160,7 +159,9 @@ class AskLLM:
             raise ValidationError("max_effective_tool_steps must be positive")
 
         if stream and (tools_schema or response_format):
-            raise ValidationError("stream=True is not supported with tools_schema or response_format")
+            raise ValidationError(
+                "stream=True is not supported with tools_schema or response_format"
+            )
 
         # Rate limiting: wait if needed before making API call
         await self._wait_if_needed()
@@ -195,7 +196,9 @@ class AskLLM:
                 temperature=temperature,
                 system_instruct=system_instruct or "",
             )
-            text, usage = result if isinstance(result, tuple) else (result, TokenUsage(0, 0, 0, None))
+            text, usage = (
+                result if isinstance(result, tuple) else (result, TokenUsage(0, 0, 0, None))
+            )
             return AskResult(text=text, usage=self._usage_with_cost(usage))
 
         try:
@@ -208,14 +211,16 @@ class AskLLM:
                 raise
             if is_rate_limit_error(e):
                 logger.error(
-                    f"Rate limit exceeded for model '{self._model}' after {self._max_retries} attempts"
+                    "Rate limit exceeded for model '%s' after %d attempts",
+                    self._model,
+                    self._max_retries,
                 )
                 raise RateLimitError(
                     f"Rate limit exceeded after {self._max_retries} retries: {e}"
                 ) from e
             logger.error(f"API call failed for model '{self._model}': {e}")
             raise APIError(f"Failed to generate response: {e}") from e
-    
+
     def _ask_stream(
         self,
         *,
@@ -227,6 +232,7 @@ class AskLLM:
         system_instruct: str,
     ) -> StreamResult:
         """Stream text chunks with usage and rate-limit retry."""
+
         def create_stream() -> AsyncIterator[Union[str, TokenUsage]]:
             return self._client.generate_stream(
                 prompt=prompt,

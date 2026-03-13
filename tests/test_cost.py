@@ -1,7 +1,5 @@
 """Tests for cost module."""
 
-import pytest
-
 from coffee_with_llm.cost import estimate_cost
 from coffee_with_llm.types import TokenUsage
 

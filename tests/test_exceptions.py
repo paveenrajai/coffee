@@ -64,4 +64,3 @@ class TestValidationError:
         """Test that ValidationError can be raised."""
         with pytest.raises(ValidationError):
             raise ValidationError("Validation error")
-

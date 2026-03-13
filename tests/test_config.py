@@ -1,7 +1,8 @@
 """Tests for Config."""
 
-import pytest
 from unittest.mock import patch
+
+import pytest
 
 from coffee_with_llm import Config
 from coffee_with_llm.exceptions import ConfigurationError

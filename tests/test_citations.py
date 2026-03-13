@@ -1,6 +1,5 @@
 """Tests for Google citation utilities."""
 
-import pytest
 from unittest.mock import MagicMock
 
 from coffee_with_llm.providers.google.utils.citations import (

@@ -29,5 +29,9 @@ def get_provider(
     if model_lower.startswith("claude") or model_lower.startswith("anthropic"):
         return AnthropicMessagesClient(**kwargs)
     if model_lower.startswith("gemini") or model_lower.startswith("google"):
-        return GoogleTextClient(**kwargs, google_explicit_cache=google_explicit_cache, google_inline_citations=google_inline_citations)
+        return GoogleTextClient(
+            **kwargs,
+            google_explicit_cache=google_explicit_cache,
+            google_inline_citations=google_inline_citations,
+        )
     return OpenAIResponsesClient(**kwargs)

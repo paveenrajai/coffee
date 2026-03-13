@@ -1,9 +1,8 @@
 """Tests for Anthropic provider."""
 
-import sys
+from unittest.mock import MagicMock, patch
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 
 from coffee_with_llm import Config
 from coffee_with_llm.exceptions import ConfigurationError
@@ -13,7 +12,12 @@ from coffee_with_llm.providers.tool_utils import normalize_tool_result
 
 
 def _config(anthropic_api_key="test-key"):
-    return Config(openai_api_key=None, anthropic_api_key=anthropic_api_key, google_api_key=None, request_timeout=60.0)
+    return Config(
+        openai_api_key=None,
+        anthropic_api_key=anthropic_api_key,
+        google_api_key=None,
+        request_timeout=60.0,
+    )
 
 
 class TestAnthropicMessagesClientInitialization:
@@ -21,7 +25,9 @@ class TestAnthropicMessagesClientInitialization:
 
     def test_init_without_api_key(self):
         """Test that missing API key raises ConfigurationError."""
-        cfg = Config(openai_api_key=None, anthropic_api_key=None, google_api_key=None, request_timeout=60.0)
+        cfg = Config(
+            openai_api_key=None, anthropic_api_key=None, google_api_key=None, request_timeout=60.0
+        )
         with pytest.raises(ConfigurationError, match="Anthropic.*not configured"):
             AnthropicMessagesClient(config=cfg)
 
@@ -35,6 +41,7 @@ class TestAnthropicMessagesClientInitialization:
     def test_init_with_missing_anthropic_package(self):
         """Test that missing Anthropic package raises ConfigurationError."""
         import builtins
+
         original_import = builtins.__import__
 
         def mock_import(name, *args, **kwargs):
@@ -138,9 +145,7 @@ class TestAnthropicMessagesClientGenerate:
 
         with patch.dict("sys.modules", {"anthropic": fake_anthropic}):
             client = AnthropicMessagesClient(config=_config())
-            text, usage = await client.generate(
-                prompt="What is Python?", model="claude-sonnet-4-6"
-            )
+            text, usage = await client.generate(prompt="What is Python?", model="claude-sonnet-4-6")
             assert text == "Test response"
             assert usage is not None
             assert usage.input_tokens == 10

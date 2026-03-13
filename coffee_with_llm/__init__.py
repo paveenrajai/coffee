@@ -1,6 +1,6 @@
 from .config import Config
 from .cost import estimate_cost
-from .exceptions import AskLLMError, ConfigurationError, APIError, ValidationError, RateLimitError
+from .exceptions import APIError, AskLLMError, ConfigurationError, RateLimitError, ValidationError
 from .llm import AskLLM
 from .types import AskResult, StreamResult, TokenUsage
 

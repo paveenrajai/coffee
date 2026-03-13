@@ -35,12 +35,12 @@ def mock_openai_client():
     mock_response.usage = MagicMock()
     mock_response.usage.cached_tokens = 0
     mock_response.usage.prompt_tokens = 10
-    
+
     async def mock_generate(*args, **kwargs):
         return mock_response
-    
+
     mock_client.responses.create = mock_generate
-    
+
     with patch("openai.AsyncOpenAI", return_value=mock_client):
         yield mock_client
 
@@ -51,12 +51,13 @@ def mock_google_client():
     mock_client = MagicMock()
     mock_response = MagicMock()
     mock_response.text = "Test response"
-    
+
     async def mock_generate(*args, **kwargs):
         return mock_response
-    
-    mock_client.models.generate_content = mock_generate
-    
-    with patch("coffee_with_llm.providers.google.text_client.genai.Client", return_value=mock_client):
-        yield mock_client
 
+    mock_client.models.generate_content = mock_generate
+
+    with patch(
+        "coffee_with_llm.providers.google.text_client.genai.Client", return_value=mock_client
+    ):
+        yield mock_client

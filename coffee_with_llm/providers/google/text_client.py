@@ -1,24 +1,18 @@
 from __future__ import annotations
 
-import inspect
-import json
-import logging
 import hashlib
+import inspect
+import logging
 import time
-from typing import Any, AsyncIterator, Callable, Dict, List, Optional, Union
 from collections import OrderedDict
+from typing import Any, AsyncIterator, Callable, Dict, List, Optional, Union
 
+import httpx
 from google import genai
 from google.genai import types
-from .utils.citations import (
-    inject_inline_citations,
-    collect_grounding_urls,
-    async_resolve_urls,
-)
-import httpx
 
 from ...config import Config
-from ...exceptions import ConfigurationError, APIError
+from ...exceptions import APIError, ConfigurationError
 from ...rate_limit import is_rate_limit_error
 from ...types import TokenUsage
 from ..tool_utils import (
@@ -27,6 +21,11 @@ from ..tool_utils import (
     should_break_loop,
     update_step_tracking,
 )
+from .utils.citations import (
+    async_resolve_urls,
+    collect_grounding_urls,
+    inject_inline_citations,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -34,12 +33,14 @@ MAX_CACHED_CONTEXTS = 10
 CONTEXT_TTL_SECONDS = 3600  # 1 hour
 
 # Gemini API rejects these JSON Schema keys; strip them when converting.
-_GEMINI_REJECTED_KEYS = frozenset({
-    "$defs",
-    "$ref",
-    "additionalProperties",
-    "additional_properties",
-})
+_GEMINI_REJECTED_KEYS = frozenset(
+    {
+        "$defs",
+        "$ref",
+        "additionalProperties",
+        "additional_properties",
+    }
+)
 
 
 def _inline_json_schema_refs(schema: Dict[str, Any]) -> Dict[str, Any]:
@@ -62,11 +63,7 @@ def _inline_json_schema_refs(schema: Dict[str, Any]) -> Dict[str, Any]:
                     if key in defs_map:
                         return resolve(defs_map[key])
                 return obj
-            return {
-                k: resolve(v)
-                for k, v in obj.items()
-                if k not in _GEMINI_REJECTED_KEYS
-            }
+            return {k: resolve(v) for k, v in obj.items() if k not in _GEMINI_REJECTED_KEYS}
         if isinstance(obj, list):
             return [resolve(v) for v in obj]
         return obj
@@ -91,26 +88,36 @@ def _convert_tools_to_gemini(tools_schema: List[Dict[str, Any]]) -> List[Dict[st
                 continue
             params = fn.get("parameters", {})
             params = _inline_json_schema_refs(params) if isinstance(params, dict) else {}
-            gemini_tools.append({
-                "name": fn.get("name", "unknown"),
-                "description": fn.get("description", ""),
-                "parameters": params,
-            })
+            gemini_tools.append(
+                {
+                    "name": fn.get("name", "unknown"),
+                    "description": fn.get("description", ""),
+                    "parameters": params,
+                }
+            )
         elif "name" in t and "parameters" in t:
-            params = _inline_json_schema_refs(t["parameters"]) if isinstance(t.get("parameters"), dict) else t["parameters"]
-            gemini_tools.append({
-                "name": t["name"],
-                "description": t.get("description", ""),
-                "parameters": params,
-            })
+            params = (
+                _inline_json_schema_refs(t["parameters"])
+                if isinstance(t.get("parameters"), dict)
+                else t["parameters"]
+            )
+            gemini_tools.append(
+                {
+                    "name": t["name"],
+                    "description": t.get("description", ""),
+                    "parameters": params,
+                }
+            )
         elif "name" in t and "description" in t:
             raw_params = t.get("parameters", t.get("input_schema", {}))
             params = _inline_json_schema_refs(raw_params) if isinstance(raw_params, dict) else {}
-            gemini_tools.append({
-                "name": t["name"],
-                "description": t.get("description", ""),
-                "parameters": params,
-            })
+            gemini_tools.append(
+                {
+                    "name": t["name"],
+                    "description": t.get("description", ""),
+                    "parameters": params,
+                }
+            )
     return gemini_tools
 
 
@@ -163,9 +170,7 @@ class GoogleTextClient:
         if not is_json_response:
             gemini_decls = _convert_tools_to_gemini(tools_schema or [])
             if gemini_decls:
-                config_dict["tools"] = [
-                    types.Tool(function_declarations=gemini_decls)
-                ]
+                config_dict["tools"] = [types.Tool(function_declarations=gemini_decls)]
             elif include_google_search and not tools_schema:
                 config_dict["tools"] = [{"google_search": {}}]
 
@@ -248,12 +253,10 @@ class GoogleTextClient:
                 )
             except AttributeError:
                 try:
-                    cached_context = (
-                        await self._client.aio.models.cached_contents.create(
-                            model=model,
-                            contents=[static_content],
-                            ttl=self._context_ttl_seconds,
-                        )
+                    cached_context = await self._client.aio.models.cached_contents.create(
+                        model=model,
+                        contents=[static_content],
+                        ttl=self._context_ttl_seconds,
                     )
                 except (AttributeError, Exception):
                     return None
@@ -277,7 +280,9 @@ class GoogleTextClient:
     def _get_tool_error_retry_message(
         self,
         output_payloads: List[Dict[str, Any]],
-        tool_error_callback: Optional[Callable[[str, Optional[str], Dict[str, Any]], Optional[str]]],
+        tool_error_callback: Optional[
+            Callable[[str, Optional[str], Dict[str, Any]], Optional[str]]
+        ],
     ) -> Optional[str]:
         """Check tool outputs for errors; return retry message if callback provides one."""
         if not tool_error_callback:
@@ -321,9 +326,7 @@ class GoogleTextClient:
                 out.append({"role": "user", "parts": [{"text": prompt}]})
             else:
                 merged = (
-                    f"{system_instruct}\n\n{prompt}"
-                    if (system_instruct or "").strip()
-                    else prompt
+                    f"{system_instruct}\n\n{prompt}" if (system_instruct or "").strip() else prompt
                 )
                 out.append(merged)
         return out
@@ -363,7 +366,9 @@ class GoogleTextClient:
         tools_schema: Optional[List[Dict[str, Any]]] = None,
         response_format: Optional[Dict[str, Any]] = None,
         execute_tool_cb: Optional[Callable[[str, Dict[str, Any]], Any]] = None,
-        tool_error_callback: Optional[Callable[[str, Optional[str], Dict[str, Any]], Optional[str]]] = None,
+        tool_error_callback: Optional[
+            Callable[[str, Optional[str], Dict[str, Any]], Optional[str]]
+        ] = None,
         max_steps: int = 16,
         max_effective_tool_steps: int = 8,
         force_tool_use: bool = False,
@@ -378,9 +383,7 @@ class GoogleTextClient:
 
         system_instruct = system_instruct or (instructions or "")
         use_tools = bool(tools_schema and execute_tool_cb)
-        cached_context_name = await self._get_or_create_cached_context(
-            system_instruct, model
-        )
+        cached_context_name = await self._get_or_create_cached_context(system_instruct, model)
 
         def build_initial_contents() -> List[Any]:
             return self._build_initial_contents(
@@ -452,15 +455,19 @@ class GoogleTextClient:
                 if name and "reasoning" not in (name or "").lower():
                     had_non_reasoning_tool = True
 
-            retry_message = self._get_tool_error_retry_message(
-                output_payloads, tool_error_callback
-            )
+            retry_message = self._get_tool_error_retry_message(output_payloads, tool_error_callback)
             if retry_message is not None:
-                contents = build_initial_contents() + [{"role": "user", "parts": [{"text": retry_message}]}]
+                contents = build_initial_contents() + [
+                    {"role": "user", "parts": [{"text": retry_message}]}
+                ]
                 request_kwargs["contents"] = contents
                 continue
 
-            model_content = getattr(last_resp.candidates[0], "content", None) if last_resp and getattr(last_resp, "candidates", None) else None
+            model_content = (
+                getattr(last_resp.candidates[0], "content", None)
+                if last_resp and getattr(last_resp, "candidates", None)
+                else None
+            )
             if model_content is not None:
                 contents.append(model_content)
 
@@ -489,7 +496,11 @@ class GoogleTextClient:
             ):
                 break
 
-        text = str(getattr(last_resp, "text", None) or getattr(last_resp, "output_text", "") or "") if last_resp else ""
+        text = (
+            str(getattr(last_resp, "text", None) or getattr(last_resp, "output_text", "") or "")
+            if last_resp
+            else ""
+        )
         if not text.strip():
             text = last_nonempty_output or ""
 
@@ -500,12 +511,8 @@ class GoogleTextClient:
             if self._google_inline_citations and last_resp:
                 urls = collect_grounding_urls(last_resp)
                 if urls:
-                    async with httpx.AsyncClient(
-                        follow_redirects=True, timeout=2
-                    ) as http:
-                        resolved = await async_resolve_urls(
-                            urls, http, max_concurrency=4
-                        )
+                    async with httpx.AsyncClient(follow_redirects=True, timeout=2) as http:
+                        resolved = await async_resolve_urls(urls, http, max_concurrency=4)
                     text = inject_inline_citations(
                         text,
                         last_resp,

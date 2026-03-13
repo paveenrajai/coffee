@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Set
 import asyncio
+from typing import Any, Dict, List, Optional, Set
 
 import httpx
 
@@ -9,20 +9,31 @@ import httpx
 def extract_citations(resp: Any) -> List[Dict[str, Any]]:
     citations: List[Dict[str, Any]] = []
 
-    def add(uri: Optional[str], title: Optional[str], start_idx: Optional[int] = None, end_idx: Optional[int] = None) -> None:
+    def add(
+        uri: Optional[str],
+        title: Optional[str],
+        start_idx: Optional[int] = None,
+        end_idx: Optional[int] = None,
+    ) -> None:
         if not (uri or title):
             return
-        citations.append({
-            "uri": uri,
-            "title": title,
-            "start_index": start_idx,
-            "end_index": end_idx,
-        })
+        citations.append(
+            {
+                "uri": uri,
+                "title": title,
+                "start_index": start_idx,
+                "end_index": end_idx,
+            }
+        )
 
     try:
         gm = getattr(resp, "grounding_metadata", None) or getattr(resp, "groundingMetadata", None)
         if gm:
-            atts = getattr(gm, "grounding_attributions", None) or getattr(gm, "attributions", None) or []
+            atts = (
+                getattr(gm, "grounding_attributions", None)
+                or getattr(gm, "attributions", None)
+                or []
+            )
             for a in atts:
                 web = getattr(a, "web", None) or getattr(a, "source", None) or {}
                 uri = getattr(web, "uri", None) or getattr(web, "url", None)
@@ -44,9 +55,15 @@ def extract_citations(resp: Any) -> List[Dict[str, Any]]:
 
     try:
         for cand in getattr(resp, "candidates", []) or []:
-            gm = getattr(cand, "grounding_metadata", None) or getattr(cand, "groundingMetadata", None)
+            gm = getattr(cand, "grounding_metadata", None) or getattr(
+                cand, "groundingMetadata", None
+            )
             if gm:
-                atts = getattr(gm, "grounding_attributions", None) or getattr(gm, "attributions", None) or []
+                atts = (
+                    getattr(gm, "grounding_attributions", None)
+                    or getattr(gm, "attributions", None)
+                    or []
+                )
                 for a in atts:
                     web = getattr(a, "web", None) or getattr(a, "source", None) or {}
                     uri = getattr(web, "uri", None) or getattr(web, "url", None)
@@ -55,7 +72,9 @@ def extract_citations(resp: Any) -> List[Dict[str, Any]]:
 
             cm = getattr(cand, "citation_metadata", None) or getattr(cand, "citationMetadata", None)
             if cm:
-                sources = getattr(cm, "citation_sources", None) or getattr(cm, "sources", None) or []
+                sources = (
+                    getattr(cm, "citation_sources", None) or getattr(cm, "sources", None) or []
+                )
                 for s in sources:
                     uri = getattr(s, "uri", None) or getattr(s, "url", None)
                     title = getattr(s, "title", None)
@@ -93,7 +112,9 @@ def resolve_vertex_redirect(url: str, client: httpx.Client, cache: Dict[str, str
     try:
         if url in cache:
             return cache[url]
-        if "vertexaisearch.cloud.google.com" in (url or "") and "/grounding-api-redirect/" in (url or ""):
+        if "vertexaisearch.cloud.google.com" in (url or "") and "/grounding-api-redirect/" in (
+            url or ""
+        ):
             try:
                 r = client.head(url)
                 final_url = str(r.url)
@@ -107,7 +128,9 @@ def resolve_vertex_redirect(url: str, client: httpx.Client, cache: Dict[str, str
         return url
 
 
-def resolve_citation_urls(citations: List[Dict[str, Any]], client: httpx.Client) -> List[Dict[str, Any]]:
+def resolve_citation_urls(
+    citations: List[Dict[str, Any]], client: httpx.Client
+) -> List[Dict[str, Any]]:
     cache: Dict[str, str] = {}
     out: List[Dict[str, Any]] = []
     for c in citations:
@@ -125,7 +148,9 @@ def collect_grounding_urls(resp: Any) -> Set[str]:
         if not gm:
             cands = getattr(resp, "candidates", []) or []
             if cands:
-                gm = getattr(cands[0], "grounding_metadata", None) or getattr(cands[0], "groundingMetadata", None)
+                gm = getattr(cands[0], "grounding_metadata", None) or getattr(
+                    cands[0], "groundingMetadata", None
+                )
         if not gm:
             return urls
         chunks = getattr(gm, "grounding_chunks", None) or getattr(gm, "chunks", None) or []
@@ -142,7 +167,9 @@ def collect_grounding_urls(resp: Any) -> Set[str]:
         return urls
 
 
-async def async_resolve_urls(urls: Set[str], client: httpx.AsyncClient, max_concurrency: int = 4) -> Dict[str, str]:
+async def async_resolve_urls(
+    urls: Set[str], client: httpx.AsyncClient, max_concurrency: int = 4
+) -> Dict[str, str]:
     cache: Dict[str, str] = {}
 
     sem = asyncio.Semaphore(max_concurrency)
@@ -150,7 +177,9 @@ async def async_resolve_urls(urls: Set[str], client: httpx.AsyncClient, max_conc
     async def resolve_one(u: str) -> None:
         try:
             async with sem:
-                if "vertexaisearch.cloud.google.com" in (u or "") and "/grounding-api-redirect/" in (u or ""):
+                if "vertexaisearch.cloud.google.com" in (
+                    u or ""
+                ) and "/grounding-api-redirect/" in (u or ""):
                     try:
                         r = await client.head(u)
                         final_url = str(r.url)
@@ -178,7 +207,9 @@ def inject_inline_citations(text: str, resp: Any, resolve_url) -> str:
         if not gm:
             cands = getattr(resp, "candidates", []) or []
             if cands:
-                gm = getattr(cands[0], "grounding_metadata", None) or getattr(cands[0], "groundingMetadata", None)
+                gm = getattr(cands[0], "grounding_metadata", None) or getattr(
+                    cands[0], "groundingMetadata", None
+                )
         if not gm:
             return text
 
@@ -202,7 +233,9 @@ def inject_inline_citations(text: str, resp: Any, resolve_url) -> str:
             try:
                 seg = getattr(s, "segment", None) or {}
                 end_idx = getattr(seg, "end_index", None)
-                idxs = getattr(s, "grounding_chunk_indices", None) or getattr(s, "indices", None) or []
+                idxs = (
+                    getattr(s, "grounding_chunk_indices", None) or getattr(s, "indices", None) or []
+                )
                 if not isinstance(end_idx, int):
                     continue
                 urls: List[str] = []

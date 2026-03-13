@@ -1,16 +1,14 @@
 """Tests for provider registry."""
 
 import sys
-
-import pytest
 from unittest.mock import MagicMock, patch
 
 from coffee_with_llm import Config
-from coffee_with_llm.providers.registry import get_provider
-from coffee_with_llm.providers.protocol import ProviderProtocol
 from coffee_with_llm.providers.anthropic import AnthropicMessagesClient
 from coffee_with_llm.providers.google import GoogleTextClient
 from coffee_with_llm.providers.openai import OpenAIResponsesClient
+from coffee_with_llm.providers.protocol import ProviderProtocol
+from coffee_with_llm.providers.registry import get_provider
 
 
 def _config():

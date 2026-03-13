@@ -6,7 +6,7 @@ import logging
 from typing import Any, AsyncIterator, Callable, Dict, List, Optional, Union
 
 from ...config import Config
-from ...exceptions import ConfigurationError, APIError
+from ...exceptions import APIError, ConfigurationError
 from ...rate_limit import is_rate_limit_error
 from ...types import TokenUsage
 from ..tool_utils import (
@@ -41,11 +41,11 @@ class OpenAIResponsesClient:
     @staticmethod
     def _parse_response_format(response_format: Any) -> Optional[Dict[str, Any]]:
         """Parse response format parameter into OpenAI Responses API format.
-        
+
         The Responses API expects text.format structure:
         - For json_schema: {"format": {"type": "json_schema", "name": "...", "schema": {...}}}
         - For json_object: {"format": {"type": "json_object"}}
-        
+
         This method converts from Chat Completions API format if needed.
         """
         if not response_format:
@@ -67,7 +67,7 @@ class OpenAIResponsesClient:
                         }
                     }
                 return {"format": response_format}
-            
+
             # Already in correct format or other type
             return {"format": response_format}
 
@@ -130,8 +130,7 @@ class OpenAIResponsesClient:
             preview = reasoning_text[:REASONING_PREVIEW_LENGTH]
             suffix = "..." if len(reasoning_text) > REASONING_PREVIEW_LENGTH else ""
             logger.debug(
-                f"LLM reasoning extracted ({len(reasoning_text)} chars): "
-                f"{preview}{suffix}"
+                f"LLM reasoning extracted ({len(reasoning_text)} chars): {preview}{suffix}"
             )
         else:
             logger.debug(
@@ -198,9 +197,7 @@ class OpenAIResponsesClient:
             payload = fco.get("payload", {})
             if payload.get("ok"):
                 continue
-            msg = tool_error_callback(
-                fco.get("name") or "", extract_error_code(payload), payload
-            )
+            msg = tool_error_callback(fco.get("name") or "", extract_error_code(payload), payload)
             if msg:
                 return msg
         return None
@@ -215,7 +212,13 @@ class OpenAIResponsesClient:
         finalize_params = dict(params)
         finalize_params.pop("tools", None)
         finalize_params_input = list(input_list) + [
-            {"role": "system", "content": "Finalize now. Return the final answer in the requested format. No further tool calls."}
+            {
+                "role": "system",
+                "content": (
+                    "Finalize now. Return the final answer in the requested format. "
+                    "No further tool calls."
+                ),
+            }
         ]
         finalize_params["input"] = finalize_params_input
         finalize_resp = await client.responses.create(**finalize_params)
@@ -273,7 +276,9 @@ class OpenAIResponsesClient:
         tools_schema: Optional[List[Dict[str, Any]]] = None,
         response_format: Optional[Any] = None,
         execute_tool_cb: Optional[Callable[[str, Dict[str, Any]], Any]] = None,
-        tool_error_callback: Optional[Callable[[str, Optional[str], Dict[str, Any]], Optional[str]]] = None,
+        tool_error_callback: Optional[
+            Callable[[str, Optional[str], Dict[str, Any]], Optional[str]]
+        ] = None,
         max_steps: int = 16,
         max_effective_tool_steps: int = 8,
         force_tool_use: bool = False,
@@ -296,20 +301,24 @@ class OpenAIResponsesClient:
 
         # Build input list from conversation history + current prompt
         input_list: List[Dict[str, Any]] = []
-        
+
         # Add conversation history if provided
         if messages:
             for msg in messages:
-                input_list.append({
-                    "role": msg.get("role", "user"),
-                    "content": msg.get("content", ""),
-                })
-        
+                input_list.append(
+                    {
+                        "role": msg.get("role", "user"),
+                        "content": msg.get("content", ""),
+                    }
+                )
+
         # Add current prompt as the latest user message
-        input_list.append({
-            "role": "user",
-            "content": prompt,
-        })
+        input_list.append(
+            {
+                "role": "user",
+                "content": prompt,
+            }
+        )
 
         base_input: List[Dict[str, Any]] = [dict(m) for m in input_list]
 
@@ -376,10 +385,7 @@ class OpenAIResponsesClient:
                 logger.debug(f"Failed to extract output text: {e}")
 
             required_action = getattr(resp, "required_action", None)
-            if (
-                required_action
-                and getattr(required_action, "type", None) == "submit_tool_outputs"
-            ):
+            if required_action and getattr(required_action, "type", None) == "submit_tool_outputs":
                 submit = getattr(required_action, "submit_tool_outputs", None)
                 tool_calls = getattr(submit, "tool_calls", []) if submit else []
 
@@ -397,9 +403,7 @@ class OpenAIResponsesClient:
                     if (name or "") != REASONING_LOG_TOOL_NAME:
                         had_non_reasoning_tool = True
 
-                    outputs.append(
-                        {"tool_call_id": tc_id, "output": json.dumps(result_payload)}
-                    )
+                    outputs.append({"tool_call_id": tc_id, "output": json.dumps(result_payload)})
 
                 retry_message = self._get_tool_error_retry_message(
                     tool_calls, outputs, tool_error_callback
@@ -421,7 +425,9 @@ class OpenAIResponsesClient:
                         pending_resp = resp
                     except Exception as e:
                         if is_rate_limit_error(e):
-                            logger.warning(f"OpenAI API rate limit hit when submitting tool outputs: {e}")
+                            logger.warning(
+                                f"OpenAI API rate limit hit when submitting tool outputs: {e}"
+                            )
                             raise
                         logger.error(f"Failed to submit tool outputs: {e}")
                         raise APIError(f"Failed to submit tool outputs: {e}") from e
@@ -488,12 +494,12 @@ class OpenAIResponsesClient:
                     if (name or "") != REASONING_LOG_TOOL_NAME:
                         had_non_reasoning_tool = True
 
-                retry_message_fc = self._get_fc_error_retry_message(
-                    fc_outputs, tool_error_callback
-                )
+                retry_message_fc = self._get_fc_error_retry_message(fc_outputs, tool_error_callback)
                 if retry_message_fc is not None:
-                    logger.info("[TOOL_ERROR] New session (callback returned retry message, output-array path)")
-                    # Revert the output append so we don't send orphaned function_calls without outputs
+                    logger.info(
+                        "[TOOL_ERROR] New session (callback retry, output-array path)"
+                    )
+                    # Revert output append to avoid orphaned function_calls
                     for _ in output_items:
                         input_list.pop()
                     new_input = base_input + [{"role": "user", "content": retry_message_fc}]
@@ -508,11 +514,13 @@ class OpenAIResponsesClient:
                             "[TOOL_OUTPUT] function_call missing call_id: name=%s",
                             getattr(fc, "name", "?"),
                         )
-                    input_list.append({
-                        "type": "function_call_output",
-                        "call_id": call_id,
-                        "output": json.dumps(fco["payload"]),
-                    })
+                    input_list.append(
+                        {
+                            "type": "function_call_output",
+                            "call_id": call_id,
+                            "output": json.dumps(fco["payload"]),
+                        }
+                    )
 
                 params["input"] = input_list
 
@@ -577,7 +585,9 @@ class OpenAIResponsesClient:
         input_list: List[Dict[str, Any]] = []
         if messages:
             for msg in messages:
-                input_list.append({"role": msg.get("role", "user"), "content": msg.get("content", "")})
+                input_list.append(
+                    {"role": msg.get("role", "user"), "content": msg.get("content", "")}
+                )
         input_list.append({"role": "user", "content": prompt})
 
         params: Dict[str, Any] = {"model": model, "input": input_list}

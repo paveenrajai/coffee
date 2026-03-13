@@ -1,7 +1,6 @@
 """Tests for rate_limit module."""
 
 import pytest
-from unittest.mock import AsyncMock, patch
 
 from coffee_with_llm.rate_limit import (
     RATE_LIMIT_BACKOFF_BASE,
@@ -28,8 +27,8 @@ class TestIsRateLimitError:
 
     def test_http_status_error_429(self):
         try:
-            from httpx import HTTPStatusError
-            from httpx import Request, Response
+            from httpx import HTTPStatusError, Request, Response
+
             req = Request("GET", "https://api.example.com")
             resp = Response(429)
             err = HTTPStatusError("429", request=req, response=resp)
@@ -95,7 +94,9 @@ class TestRetryStream:
             yield "b"
             yield TokenUsage(1, 2, 3, None)
 
-        factory = lambda: stream()
+        def factory():
+            return stream()
+
         chunks = []
         async for item in retry_stream(factory, max_retries=3):
             chunks.append(item)
@@ -116,7 +117,9 @@ class TestRetryStream:
             yield "b"
             yield TokenUsage(0, 0, 0, None)
 
-        factory = lambda: stream()
+        def factory():
+            return stream()
+
         chunks = []
         async for item in retry_stream(factory, max_retries=3):
             chunks.append(item)

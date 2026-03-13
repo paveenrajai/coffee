@@ -59,12 +59,12 @@ class StreamResult:
 
     async def __anext__(self) -> str:
         if self._iter is None:
-            raise RuntimeError("StreamResult must be iterated via async for; __aiter__ was not called")
+            raise RuntimeError(
+                "StreamResult must be iterated via async for; __aiter__ was not called"
+            )
         item = await self._iter.__anext__()
         if isinstance(item, TokenUsage):
-            self._usage = (
-                self._usage_callback(item) if self._usage_callback else item
-            )
+            self._usage = self._usage_callback(item) if self._usage_callback else item
             raise StopAsyncIteration
         return item
 

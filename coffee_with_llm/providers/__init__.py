@@ -13,4 +13,3 @@ __all__ = [
     "ProviderProtocol",
     "get_provider",
 ]
-

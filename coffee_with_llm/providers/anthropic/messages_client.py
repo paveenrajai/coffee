@@ -8,7 +8,7 @@ import logging
 from typing import Any, AsyncIterator, Callable, Dict, List, Optional, Union
 
 from ...config import Config
-from ...exceptions import ConfigurationError, APIError
+from ...exceptions import APIError, ConfigurationError
 from ...rate_limit import is_rate_limit_error
 from ...types import TokenUsage
 from ..tool_utils import (
@@ -39,19 +39,23 @@ def _convert_tools_to_anthropic(tools_schema: List[Dict[str, Any]]) -> List[Dict
             if not isinstance(fn, dict) or "name" not in fn:
                 continue
             params = fn.get("parameters", {})
-            anthropic_tools.append({
-                "name": fn.get("name", "unknown"),
-                "description": fn.get("description", ""),
-                "input_schema": params if isinstance(params, dict) else {},
-            })
+            anthropic_tools.append(
+                {
+                    "name": fn.get("name", "unknown"),
+                    "description": fn.get("description", ""),
+                    "input_schema": params if isinstance(params, dict) else {},
+                }
+            )
         elif "name" in t and "input_schema" in t:
             anthropic_tools.append(t)
         elif "name" in t and "description" in t:
-            anthropic_tools.append({
-                "name": t["name"],
-                "description": t.get("description", ""),
-                "input_schema": t.get("input_schema", t.get("parameters", {})),
-            })
+            anthropic_tools.append(
+                {
+                    "name": t["name"],
+                    "description": t.get("description", ""),
+                    "input_schema": t.get("input_schema", t.get("parameters", {})),
+                }
+            )
     return anthropic_tools
 
 
@@ -156,7 +160,9 @@ class AnthropicMessagesClient:
     def _get_tool_error_retry_message(
         self,
         output_payloads: List[Dict[str, Any]],
-        tool_error_callback: Optional[Callable[[str, Optional[str], Dict[str, Any]], Optional[str]]],
+        tool_error_callback: Optional[
+            Callable[[str, Optional[str], Dict[str, Any]], Optional[str]]
+        ],
     ) -> Optional[str]:
         """Check tool outputs for errors; return retry message if callback provides one."""
         if not tool_error_callback:
@@ -181,7 +187,10 @@ class AnthropicMessagesClient:
         finalize_params = dict(params)
         finalize_params.pop("tools", None)
         finalize_params["messages"] = base_messages + [
-            {"role": "user", "content": "Finalize now. Return the final answer. No further tool calls."}
+            {
+                "role": "user",
+                "content": "Finalize now. Return the final answer. No further tool calls.",
+            }
         ]
         finalize_resp = await client.messages.create(**finalize_params)
         text = self._content_to_text(getattr(finalize_resp, "content", []) or [])
@@ -206,12 +215,14 @@ class AnthropicMessagesClient:
                     out.append({"type": "text", "text": getattr(block, "text", "") or ""})
                 elif btype == "tool_use":
                     inp = getattr(block, "input", {})
-                    out.append({
-                        "type": "tool_use",
-                        "id": getattr(block, "id", ""),
-                        "name": getattr(block, "name", ""),
-                        "input": inp if isinstance(inp, dict) else {},
-                    })
+                    out.append(
+                        {
+                            "type": "tool_use",
+                            "id": getattr(block, "id", ""),
+                            "name": getattr(block, "name", ""),
+                            "input": inp if isinstance(inp, dict) else {},
+                        }
+                    )
         return out
 
     async def generate(
@@ -228,7 +239,9 @@ class AnthropicMessagesClient:
         tools_schema: Optional[List[Dict[str, Any]]] = None,
         response_format: Optional[Any] = None,
         execute_tool_cb: Optional[Callable[[str, Dict[str, Any]], Any]] = None,
-        tool_error_callback: Optional[Callable[[str, Optional[str], Dict[str, Any]], Optional[str]]] = None,
+        tool_error_callback: Optional[
+            Callable[[str, Optional[str], Dict[str, Any]], Optional[str]]
+        ] = None,
         max_steps: int = 16,
         max_effective_tool_steps: int = 8,
         force_tool_use: bool = False,
@@ -302,7 +315,9 @@ class AnthropicMessagesClient:
 
             stop_reason = getattr(resp, "stop_reason", None) or "end_turn"
             block_types = [
-                b.get("type", getattr(b, "type", "?")) if isinstance(b, dict) else getattr(b, "type", "?")
+                b.get("type", getattr(b, "type", "?"))
+                if isinstance(b, dict)
+                else getattr(b, "type", "?")
                 for b in content
             ]
             usage = getattr(resp, "usage", None)
@@ -359,7 +374,9 @@ class AnthropicMessagesClient:
                     name = tu["name"]
                     inp = tu["input"]
                     result_payload = await self._execute_tool(name, inp, execute_tool_cb)
-                    output_payloads.append({"tool_use_id": tu_id, "name": name, "payload": result_payload})
+                    output_payloads.append(
+                        {"tool_use_id": tu_id, "name": name, "payload": result_payload}
+                    )
                     if name and "reasoning" not in name.lower():
                         had_non_reasoning_tool = True
 
@@ -375,12 +392,14 @@ class AnthropicMessagesClient:
 
                 tool_results: List[Dict[str, Any]] = []
                 for out in output_payloads:
-                    tool_results.append({
-                        "type": "tool_result",
-                        "tool_use_id": out["tool_use_id"],
-                        "content": json.dumps(out["payload"]),
-                        "is_error": not out["payload"].get("ok", False),
-                    })
+                    tool_results.append(
+                        {
+                            "type": "tool_result",
+                            "tool_use_id": out["tool_use_id"],
+                            "content": json.dumps(out["payload"]),
+                            "is_error": not out["payload"].get("ok", False),
+                        }
+                    )
 
                 new_messages = list(base_messages)
                 assistant_content = self._blocks_to_api_format(content)
@@ -412,7 +431,9 @@ class AnthropicMessagesClient:
                 )
                 break
 
-        final_text = self._content_to_text(getattr(last_resp, "content", []) or []) if last_resp else ""
+        final_text = (
+            self._content_to_text(getattr(last_resp, "content", []) or []) if last_resp else ""
+        )
         if not final_text.strip():
             final_text = last_nonempty_output or ""
 

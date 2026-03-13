@@ -1,7 +1,8 @@
 """Tests for stream retry behavior."""
 
-import pytest
 from unittest.mock import patch
+
+import pytest
 
 from coffee_with_llm import AskLLM, TokenUsage
 
@@ -39,6 +40,7 @@ class TestStreamRetry:
     @pytest.mark.asyncio
     async def test_stream_raises_runtime_error_if_anext_without_aiter(self, mock_openai_api_key):
         """StreamResult.__anext__ raises if called without __aiter__ first."""
+
         async def mock_stream(*args, **kwargs):
             yield "x"
             yield TokenUsage(0, 0, 0, None)

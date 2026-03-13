@@ -1,7 +1,8 @@
 """Tests for Google provider."""
 
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 
 from coffee_with_llm import Config
 from coffee_with_llm.exceptions import ConfigurationError
@@ -13,7 +14,12 @@ from coffee_with_llm.providers.google.text_client import (
 
 
 def _config(google_api_key="test-key"):
-    return Config(openai_api_key=None, anthropic_api_key=None, google_api_key=google_api_key, request_timeout=60.0)
+    return Config(
+        openai_api_key=None,
+        anthropic_api_key=None,
+        google_api_key=google_api_key,
+        request_timeout=60.0,
+    )
 
 
 class TestGoogleTextClientInitialization:
@@ -21,7 +27,9 @@ class TestGoogleTextClientInitialization:
 
     def test_init_without_api_key(self):
         """Test that missing API key raises ConfigurationError."""
-        cfg = Config(openai_api_key=None, anthropic_api_key=None, google_api_key=None, request_timeout=60.0)
+        cfg = Config(
+            openai_api_key=None, anthropic_api_key=None, google_api_key=None, request_timeout=60.0
+        )
         with pytest.raises(ConfigurationError, match="Google.*not configured"):
             GoogleTextClient(config=cfg)
 
@@ -272,9 +280,7 @@ class TestGoogleTextClientGenerate:
             mock_models = MagicMock()
             mock_response = MagicMock()
             mock_response.text = "Test response"
-            mock_response.usage_metadata = MagicMock(
-                prompt_token_count=8, candidates_token_count=4
-            )
+            mock_response.usage_metadata = MagicMock(prompt_token_count=8, candidates_token_count=4)
 
             async def mock_generate(*args, **kwargs):
                 return mock_response
@@ -320,4 +326,3 @@ class TestGoogleTextClientGenerate:
             )
             assert text == "Test response"
             assert usage is not None
-

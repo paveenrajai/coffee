@@ -1,7 +1,8 @@
 """Tests for AskLLM main class."""
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 from coffee_with_llm import AskLLM, TokenUsage
 from coffee_with_llm.exceptions import APIError, ConfigurationError, ValidationError
@@ -53,13 +54,14 @@ class TestAskLLMInitialization:
     def test_init_client_initialization_error(self, mock_openai_api_key):
         """Test that client initialization errors are wrapped."""
         import builtins
+
         original_import = builtins.__import__
-        
+
         def mock_import(name, *args, **kwargs):
             if name == "openai":
                 raise Exception("Connection failed")
             return original_import(name, *args, **kwargs)
-        
+
         with patch("builtins.__import__", side_effect=mock_import):
             with pytest.raises(ConfigurationError, match="Failed to initialize client"):
                 AskLLM(model="gpt-4o-mini")
@@ -135,9 +137,7 @@ class TestAskLLMAskMethod:
         """Test that invalid max_effective_tool_steps raises ValidationError."""
         with patch("openai.AsyncOpenAI"):
             llm = AskLLM(model="gpt-4o-mini")
-            with pytest.raises(
-                ValidationError, match="max_effective_tool_steps must be positive"
-            ):
+            with pytest.raises(ValidationError, match="max_effective_tool_steps must be positive"):
                 await llm.ask(prompt="test", max_effective_tool_steps=0)
 
     @pytest.mark.asyncio
@@ -155,15 +155,15 @@ class TestAskLLMAskMethod:
 
         mock_client.responses.create = mock_generate
 
-        with patch(
-            "openai.AsyncOpenAI", return_value=mock_client
-        ):
+        with patch("openai.AsyncOpenAI", return_value=mock_client):
             llm = AskLLM(model="gpt-4o-mini")
             mock_client_instance = MagicMock()
             mock_client_instance.generate = AsyncMock(
                 return_value=(
                     "Test response",
-                    TokenUsage(input_tokens=10, output_tokens=5, total_tokens=15, cached_tokens=None),
+                    TokenUsage(
+                        input_tokens=10, output_tokens=5, total_tokens=15, cached_tokens=None
+                    ),
                 )
             )
             llm._client.generate = mock_client_instance.generate
@@ -244,6 +244,7 @@ class TestAskLLMStreaming:
     @pytest.mark.asyncio
     async def test_stream_returns_stream_result(self, mock_openai_api_key):
         """stream=True returns StreamResult with chunks and usage."""
+
         async def mock_stream(*args, **kwargs):
             yield "Hello "
             yield "world!"
@@ -271,7 +272,9 @@ class TestAskLLMStreaming:
                 await llm.ask(
                     prompt="hi",
                     stream=True,
-                    tools_schema=[{"type": "function", "function": {"name": "x", "parameters": {}}}],
+                    tools_schema=[
+                        {"type": "function", "function": {"name": "x", "parameters": {}}}
+                    ],
                 )
 
     @pytest.mark.asyncio
@@ -285,4 +288,3 @@ class TestAskLLMStreaming:
                     stream=True,
                     response_format={"type": "json_object"},
                 )
-
