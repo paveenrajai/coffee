@@ -38,10 +38,10 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/paveenrajai/coffee"
-Documentation = "https://github.com/paveenrajai/coffee#readme"
-Repository = "https://github.com/paveenrajai/coffee"
-Issues = "https://github.com/paveenrajai/coffee/issues"
+Homepage = "https://github.com/paveenrajai/coffee-with-llm"
+Documentation = "https://github.com/paveenrajai/coffee-with-llm#readme"
+Repository = "https://github.com/paveenrajai/coffee-with-llm"
+Issues = "https://github.com/paveenrajai/coffee-with-llm/issues"
 
 [build-system]
 requires = ["setuptools>=61.0", "wheel"]
